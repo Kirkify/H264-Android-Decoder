@@ -13,6 +13,9 @@ import java.nio.ByteBuffer;
 
 public class MainActivity extends AppCompatActivity implements TextureView.SurfaceTextureListener {
 
+    private int width = 1920;
+    private int height = 1080;
+
     // View that contains the Surface Texture
     private TextureView m_surface;
 
@@ -30,9 +33,12 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // Find our desired SurfaceTexture to display the stream
         m_surface = (TextureView) findViewById(R.id.textureView);
 
+        // Add the SurfaceTextureListener
         m_surface.setSurfaceTextureListener(this);
+
     }
 
     @Override
@@ -40,14 +46,17 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
     public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int i, int i1) {
         // when the surface is ready, we make a H264 provider Object.  When its constructor
         // runs it starts an AsyncTask to log into our server and start getting frames
-        provider = new H264Provider();
+        // I have dummed down this demonstration to access the local h264 video from the raw resources dir
+        provider = new H264Provider(getResources().openRawResource(R.raw.video));
 
         //Create the format settings for the MediaCodec
-        MediaFormat format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, 1920, 1080);
-        // Set the PPS and SPS frame
-        format.setByteBuffer("csd-0", ByteBuffer.wrap(provider.getCSD()));
+        MediaFormat format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height);
+        // Set the SPS frame
+        format.setByteBuffer("csd-0", ByteBuffer.wrap(provider.getSPS()));
+        // Set the PPS frame
+        format.setByteBuffer("csd-1", ByteBuffer.wrap(provider.getPPS()));
         // Set the buffer size
-        format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 100000);
+        format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, width * height);
 
         try {
             // Get an instance of MediaCodec and give it its Mime type
@@ -99,7 +108,13 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
                 // If the buffer number is valid use the buffer with that index
                 if (inputIndex >= 0) {
                     ByteBuffer buffer = m_codec.getInputBuffer(inputIndex);
-                    buffer.put(frame);
+
+                    try {
+                        buffer.put(frame);
+                    }catch(NullPointerException e) {
+                        e.printStackTrace();
+                    }
+
                     // Tell the decoder to process the frame
                     m_codec.queueInputBuffer(inputIndex, 0, frame.length, 0, 0);
                 }
